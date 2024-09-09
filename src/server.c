@@ -7,14 +7,11 @@
 #include <errno.h>
 #include <unistd.h>
 #include <pthread.h>
-
-const char *text_plain = "text/plain";
-
-const char *ok_200 = "200 OK";
-const char *not_found_400 = "404 Not Found";
+#include "consts.h"
 
 const int BUFFER_SIZE = 256;
 
+// response should be free'd after sending
 char *build_response(const char *status, const char *content_type, char *body) {
     const char *format = "HTTP/1.1 %s\r\nContent-Type: %s\r\nContent-Length: %lu\r\n\r\n%s";
     char *resp = malloc(
@@ -29,22 +26,29 @@ int handle_request(int client_fd, char *request) {
 
     printf("%s request made to %s\n", method, path);
 
+    int send_status;
+    char* resp;
+
+    if (strcmp(method, METHOD_GET) != 0) {
+        resp = build_response(ST_METHOD_NOT_ALLOWED_405, CT_TEXT_PLAIN, "");
+        send_status = send(client_fd, resp, strlen(resp), 0);
+    }
+
     char *path_copy = path;
     char *path_1 = strtok(path_copy, "/");
     char *path_2 = strtok(NULL, "/");
 
-    int send_status;
-    char* resp;
     if (strcmp(path, "/") == 0) {
-        resp = build_response(ok_200, text_plain, "Welcome!") ;
+        resp = build_response(ST_OK_200, CT_TEXT_PLAIN, "Welcome!") ;
         send_status = send(client_fd, resp, strlen(resp), 0);
     } else if (strcmp(path_1, "echo") == 0) {
-        resp = build_response(ok_200, text_plain, path_2);
+        resp = build_response(ST_OK_200, CT_TEXT_PLAIN, path_2);
         send_status = send(client_fd, resp, strlen(resp), 0);
     } else {
-        resp = build_response(not_found_400, text_plain, "Not found");
+        resp = build_response(ST_NOT_FOUND_400, CT_TEXT_PLAIN, (char*) ST_NOT_FOUND_400);
         send_status = send(client_fd, resp, strlen(resp), 0);
     }
+
     free(resp);
 
     if (send_status == -1) {
